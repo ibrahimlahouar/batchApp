@@ -37,11 +37,11 @@ public class DynamicTableConfig extends AbstractTableConfig {
         super();
         this.enabled = true;
         // Initialiser des valeurs par défaut pour éviter les nulls
-        this.setSourceTableName("dummy_table");
-        this.setTargetTableName("dummy_table");
+        this.setSourceTableName("");
+        this.setTargetTableName("");
         this.setSourceSchema("public");
         this.setTargetSchema("public");
-        this.tableName = "dummy_table";
+        this.tableName = "";
     }
     
     /**
@@ -51,11 +51,11 @@ public class DynamicTableConfig extends AbstractTableConfig {
                              String targetSchema, String targetTable, 
                              boolean enabled) {
         super(sourceSchema != null ? sourceSchema : "", 
-              sourceTable != null ? sourceTable : "dummy_table", 
+              sourceTable != null ? sourceTable : "", 
               targetSchema != null ? targetSchema : "", 
-              targetTable != null ? targetTable : sourceTable != null ? sourceTable : "dummy_table");
+              targetTable != null ? targetTable : sourceTable != null ? sourceTable : "");
         this.enabled = enabled;
-        this.tableName = sourceTable != null ? sourceTable : "dummy_table";
+        this.tableName = sourceTable != null ? sourceTable : "";
     }
     
     /**

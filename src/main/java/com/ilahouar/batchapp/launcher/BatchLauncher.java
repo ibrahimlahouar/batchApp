@@ -77,10 +77,10 @@ public class BatchLauncher {
      * Lance tous les jobs configurés dans l'ordre défini dans le YAML
      */
     private void launchAllJobsInOrder(List<TableConfig> tableConfigs) throws Exception {
-        // Filtrer les tables factices et désactivées
+        // Filtrer les tables désactivées et avec des noms vides
         List<TableConfig> validConfigs = tableConfigs.stream()
                 .filter(TableConfig::isEnabled)
-                .filter(config -> !"dummy_table".equals(config.getSourceTableName()))
+                .filter(config -> config.getSourceTableName() != null && !config.getSourceTableName().isEmpty())
                 .collect(Collectors.toList());
         
         log.info(">>> Après filtrage: {} configs valides", validConfigs.size());
