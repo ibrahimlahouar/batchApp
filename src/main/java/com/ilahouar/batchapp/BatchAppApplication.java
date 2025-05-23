@@ -5,9 +5,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * Application principale pour le traitement batch de données entre Trino et PostgreSQL
+ * Application principale pour le traitement batch de données entre Trino et Oracle
  * 
- * Ce batch est conçu pour lire des données depuis une source Trino et les écrire dans PostgreSQL
+ * Ce batch est conçu pour lire des données depuis une source Trino et les écrire dans Oracle
  * avec un traitement parallèle pour gérer efficacement les grands volumes de données.
  */
 @SpringBootApplication

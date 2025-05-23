@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
+import jakarta.annotation.Resource;
 
 /**
  * Factory pour créer des jobs basés sur différentes configurations de tables
@@ -59,6 +60,10 @@ public class TableJobFactory {
     @Autowired
     @Qualifier("postgresDataSource")
     private DataSource postgresDataSource;
+    
+    @Resource
+    @Qualifier("oracleDataSource")
+    private DataSource oracleDataSource;
     
     @Value("${batch.chunk-size}")
     private int chunkSize;
@@ -86,10 +91,10 @@ public class TableJobFactory {
         JdbcCursorItemReader<Map<String, Object>> reader = createReader(tableConfig, trinoDataSource);
         
         // Créer le processor (utilise SchemaValidationProcessor existant)
-        SchemaValidationProcessor processor = createProcessor(tableConfig, postgresDataSource);
+        SchemaValidationProcessor processor = createProcessor(tableConfig, oracleDataSource);
         
         // Créer le writer spécifique à la table
-        JdbcBatchItemWriter<Map<String, Object>> writer = createWriter(tableConfig, postgresDataSource);
+        JdbcBatchItemWriter<Map<String, Object>> writer = createWriter(tableConfig, oracleDataSource);
         
         // Créer l'étape
         Step step = createStep(jobName + "_step", reader, processor, writer);
@@ -124,20 +129,17 @@ public class TableJobFactory {
     /**
      * Crée un processor pour la table spécifiée
      */
-    private SchemaValidationProcessor createProcessor(TableConfig tableConfig, DataSource postgresDataSource) {
-        // Note: Ceci est une méthode simplifiée qui suppose que SchemaValidationProcessor
-        // est adapté pour toutes les tables. Dans un cas réel, on pourrait avoir besoin
-        // de créer des processors spécifiques à chaque table.
+    private SchemaValidationProcessor createProcessor(TableConfig tableConfig, DataSource oracleDataSource) {
+        log.info("Création du processeur pour la table {}", tableConfig.getTargetTableName());
         
-        // Ici on utilise une technique simple pour contourner le problème de création du bean
-        // Dans une implémentation complète, on injecterait le SchemaValidationProcessor avec @Autowired
-        return new SchemaValidationProcessor(postgresDataSource, tableConfig.getTargetTableName());
+        // Dans cet exemple, on crée directement l'instance sans personnalisation spécifique par table
+        return new SchemaValidationProcessor(oracleDataSource, tableConfig.getTargetTableName());
     }
     
     /**
      * Crée un writer pour la table spécifiée
      */
-    private JdbcBatchItemWriter<Map<String, Object>> createWriter(TableConfig tableConfig, DataSource postgresDataSource) {
+    private JdbcBatchItemWriter<Map<String, Object>> createWriter(TableConfig tableConfig, DataSource oracleDataSource) {
         String tableName = tableConfig.getTargetTableName();
         String schemaName = tableConfig.getTargetSchema();
         
@@ -148,8 +150,8 @@ public class TableJobFactory {
         
         log.info("Création d'un writer pour la table: {}", fullTableName);
         
-        // Récupérer les colonnes de la table PostgreSQL
-        JdbcTemplate jdbcTemplate = new JdbcTemplate(postgresDataSource);
+        // Récupérer les colonnes de la table Oracle
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(oracleDataSource);
         String query = "SELECT column_name, data_type FROM information_schema.columns " +
                      "WHERE table_name = ? ";
         
@@ -169,7 +171,7 @@ public class TableJobFactory {
             
             if (columnData.isEmpty()) {
                 log.warn("Aucune colonne trouvée pour la table {}. Vérifiez que la table existe.", fullTableName);
-                return createDefaultWriter(fullTableName, postgresDataSource);
+                return createDefaultWriter(fullTableName, oracleDataSource);
             }
             
             // Identifier la clé primaire
@@ -226,7 +228,7 @@ public class TableJobFactory {
             }
             
             JdbcBatchItemWriter<Map<String, Object>> writer = new JdbcBatchItemWriter<>();
-            writer.setDataSource(postgresDataSource);
+            writer.setDataSource(oracleDataSource);
             writer.setSql(sql);
             writer.setItemSqlParameterSourceProvider(item -> new MapSqlParameterSource(item));
             writer.afterPropertiesSet();
@@ -234,18 +236,18 @@ public class TableJobFactory {
             return tableConfig.customizeWriter(writer);
         } catch (Exception e) {
             log.error("Erreur lors de la création du writer pour la table {}: {}", fullTableName, e.getMessage());
-            return createDefaultWriter(fullTableName, postgresDataSource);
+            return createDefaultWriter(fullTableName, oracleDataSource);
         }
     }
     
     /**
      * Crée un writer par défaut si la récupération des colonnes échoue
      */
-    private JdbcBatchItemWriter<Map<String, Object>> createDefaultWriter(String tableName, DataSource postgresDataSource) {
-        log.info("Création d'un writer par défaut pour la table: {}", tableName);
+    private JdbcBatchItemWriter<Map<String, Object>> createDefaultWriter(String tableName, DataSource oracleDataSource) {
+        JdbcBatchItemWriter<Map<String, Object>> writer = new JdbcBatchItemWriter<>();
         
-        // Essayer d'identifier la clé primaire
-        JdbcTemplate jdbcTemplate = new JdbcTemplate(postgresDataSource);
+        // Récupérer les colonnes de la table Oracle
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(oracleDataSource);
         String pkQuery = "SELECT a.attname as column_name " +
                        "FROM pg_index i " +
                        "JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) " +
@@ -259,8 +261,7 @@ public class TableJobFactory {
             String sql = String.format("INSERT INTO %s (data, %s) VALUES (:data::jsonb, :%s) ON CONFLICT (%s) DO UPDATE SET data = :data::jsonb", 
                     tableName, pkColumn, pkColumn, pkColumn);
             
-            JdbcBatchItemWriter<Map<String, Object>> writer = new JdbcBatchItemWriter<>();
-            writer.setDataSource(postgresDataSource);
+            writer.setDataSource(oracleDataSource);
             writer.setSql(sql);
             writer.setItemSqlParameterSourceProvider(item -> {
                 try {
@@ -288,8 +289,7 @@ public class TableJobFactory {
             // Utiliser un format de requête qui utilise un objet JSON sans UPSERT
             String sql = String.format("INSERT INTO %s (data) VALUES (:data::jsonb)", tableName);
             
-            JdbcBatchItemWriter<Map<String, Object>> writer = new JdbcBatchItemWriter<>();
-            writer.setDataSource(postgresDataSource);
+            writer.setDataSource(oracleDataSource);
             writer.setSql(sql);
             writer.setItemSqlParameterSourceProvider(item -> {
                 try {

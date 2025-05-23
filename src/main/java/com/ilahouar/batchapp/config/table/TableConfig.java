@@ -16,7 +16,7 @@ public interface TableConfig {
     String getSourceTableName();
     
     /**
-     * Retourne le nom de la table cible dans PostgreSQL
+     * Retourne le nom de la table cible dans Oracle
      */
     String getTargetTableName();
     
@@ -26,7 +26,7 @@ public interface TableConfig {
     String getSourceSchema();
     
     /**
-     * Retourne le schéma cible dans PostgreSQL
+     * Retourne le schéma cible dans Oracle
      */
     String getTargetSchema();
     

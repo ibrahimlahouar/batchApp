@@ -1,6 +1,6 @@
-# Batch App - Transfert de données Trino vers PostgreSQL
+# Batch App - Transfert de données Trino vers Oracle
 
-Cette application Spring Batch permet de transférer des données de tables Trino vers PostgreSQL de manière efficace et configurable.
+Cette application Spring Batch permet de transférer des données de tables Trino vers Oracle de manière efficace et configurable.
 
 ## Caractéristiques
 
@@ -10,7 +10,7 @@ Cette application Spring Batch permet de transférer des données de tables Trin
 - Configuration par profil pour différents projets (P1, P2, P3)
 - Transformation et validation des données entre les sources
 - Gestion flexible des schémas (création automatique au besoin)
-- Support des données JSONB pour une flexibilité maximale
+- Support des données JSON pour une flexibilité maximale
 - Gestion d'erreurs avec retry, skip et logging
 - Monitoring et suivi des jobs
 
@@ -39,7 +39,7 @@ Pour lancer l'application avec le profil P3 :
 ### Paramètres
 
 - `--tableName`: Nom de la table source dans Trino
-- `--targetTable`: Nom de la table cible dans PostgreSQL (par défaut, identique à tableName)
+- `--targetTable`: Nom de la table cible dans Oracle (par défaut, identique à tableName)
 - `--jobName`: Nom du job à exécuter (optionnel, alternative à tableName)
 
 ## Profils disponibles
@@ -99,6 +99,6 @@ Voir les fichiers `application-*.yml` pour la configuration détaillée de chaqu
 
 - Spring Boot 3.1.5
 - Spring Batch
-- PostgreSQL JDBC Driver
+- Oracle JDBC Driver
 - Trino JDBC Driver
 - Jackson pour le traitement JSON 

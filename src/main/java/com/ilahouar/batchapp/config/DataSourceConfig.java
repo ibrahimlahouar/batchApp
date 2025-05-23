@@ -12,7 +12,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import javax.sql.DataSource;
 
 /**
- * Configuration des sources de données pour Trino et PostgreSQL
+ * Configuration des sources de données pour Trino et Oracle
  */
 @Configuration
 public class DataSourceConfig {
@@ -29,32 +29,32 @@ public class DataSourceConfig {
     }
 
     /**
-     * Configuration de la source de données PostgreSQL
+     * Configuration de la source de données Oracle
      * Cette source sera utilisée pour écrire les données traitées
      */
     @Bean
     @Primary
-    @Qualifier("postgresDataSource")
-    @ConfigurationProperties(prefix = "spring.datasource.postgres")
-    public DataSource postgresDataSource() {
+    @Qualifier("oracleDataSource")
+    @ConfigurationProperties(prefix = "spring.datasource.oracle")
+    public DataSource oracleDataSource() {
         return DataSourceBuilder.create().build();
     }
     
     /**
      * Bean dataSource par défaut pour Spring Batch
-     * Réutilisation de la source PostgreSQL pour les métadonnées de Spring Batch
+     * Réutilisation de la source Oracle pour les métadonnées de Spring Batch
      */
     @Bean(name = "dataSource")
-    public DataSource dataSource(@Qualifier("postgresDataSource") DataSource postgresDataSource) {
-        return postgresDataSource;
+    public DataSource dataSource(@Qualifier("oracleDataSource") DataSource oracleDataSource) {
+        return oracleDataSource;
     }
 
     /**
-     * Gestionnaire de transactions pour PostgreSQL
+     * Gestionnaire de transactions pour Oracle
      */
     @Bean
     public PlatformTransactionManager transactionManager(
-            @Qualifier("postgresDataSource") DataSource dataSource) {
+            @Qualifier("oracleDataSource") DataSource dataSource) {
         return new DataSourceTransactionManager(dataSource);
     }
 } 

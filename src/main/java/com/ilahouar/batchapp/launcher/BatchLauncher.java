@@ -101,10 +101,15 @@ public class BatchLauncher {
             Job job = tableJobs.get(jobName);
             
             // Si non trouvé, essayer le job générique
-            if (job == null && tableJobs.containsKey("trinoToPostgresJob")) {
-                job = tableJobs.get("trinoToPostgresJob");
-                log.info("Utilisation du job générique trinoToPostgresJob pour la table {}", 
-                          config.getSourceTableName());
+            if (job == null) {
+                job = jobRegistry.getJob(jobName);
+            }
+            
+            // Si le job n'est pas trouvé, essayons d'utiliser le job générique trinoToOracleJob
+            if (job == null && tableJobs.containsKey("trinoToOracleJob")) {
+                job = tableJobs.get("trinoToOracleJob");
+                log.info("Utilisation du job générique trinoToOracleJob pour la table {}", 
+                        config.getSourceTableName());
             }
             
             if (job != null) {

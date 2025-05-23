@@ -6,12 +6,12 @@ spring:
   
   # Configuration des bases de données
   datasource:
-    # Configuration PostgreSQL (destination)
-    postgres:
-      jdbc-url: jdbc:postgresql://localhost:5432/mydatabase
+    # Configuration Oracle (destination)
+    oracle:
+      jdbc-url: jdbc:oracle:thin:@//localhost:1521/XEPDB1
       username: myuser
       password: mypassword
-      driver-class-name: org.postgresql.Driver
+      driver-class-name: oracle.jdbc.OracleDriver
       
     # Configuration Trino (source)
     trino:

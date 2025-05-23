@@ -1,18 +1,18 @@
 spring:
   datasource:
-    # Configuration Trino spécifique à P3
-    trino:
-      jdbc-url: jdbc:trino://localhost:8080/analytics/prod
-      username: analytics
-      password: analytics456
-      driver-class-name: io.trino.jdbc.TrinoDriver
-      
-    # Configuration PostgreSQL spécifique à P3
-    postgres:
-      jdbc-url: jdbc:postgresql://localhost:5432/mydatabase
+    # Configuration Oracle spécifique à P3
+    oracle:
+      jdbc-url: jdbc:oracle:thin:@//localhost:1521/XEPDB1
       username: myuser
       password: mypassword
-      driver-class-name: org.postgresql.Driver
+      driver-class-name: oracle.jdbc.OracleDriver
+    
+    # Configuration Trino spécifique à P3
+    trino:
+      jdbc-url: jdbc:trino://localhost:8080/tpch/sf1?SSL=false
+      username: tpch
+      password:
+      driver-class-name: io.trino.jdbc.TrinoDriver
 
 # Configuration des tables spécifiques à P3
 batch:

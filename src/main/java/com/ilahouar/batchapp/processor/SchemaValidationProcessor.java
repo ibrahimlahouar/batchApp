@@ -24,16 +24,16 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class SchemaValidationProcessor implements ItemProcessor<Map<String, Object>, Map<String, Object>> {
 
-    private final JdbcTemplate postgresTemplate;
+    private final JdbcTemplate oracleTemplate;
     private final String targetTable;
     private final Map<String, List<Map<String, Object>>> tableColumnsCache = new ConcurrentHashMap<>();
     
     public SchemaValidationProcessor(
-            @Qualifier("postgresDataSource") DataSource postgresDataSource,
-            @Value("#{jobParameters['targetTable'] ?: '${batch.postgres.table-name:default_table}'}") String targetTable) {
-        this.postgresTemplate = new JdbcTemplate(postgresDataSource);
+            @Qualifier("oracleDataSource") DataSource oracleDataSource,
+            @Value("#{jobParameters['targetTable'] ?: '${batch.oracle.table-name:default_table}'}") String targetTable) {
+        this.oracleTemplate = new JdbcTemplate(oracleDataSource);
         this.targetTable = targetTable;
-        log.info("SchemaValidationProcessor initialisé avec la table cible: {}", targetTable);
+        log.info("Initialisation du processeur de validation pour la table: {}", targetTable);
         // Initialisation du cache à la création pour éviter les requêtes multiples
         initializeColumnsCache();
     }
@@ -45,7 +45,7 @@ public class SchemaValidationProcessor implements ItemProcessor<Map<String, Obje
         try {
             String query = "SELECT column_name, data_type FROM information_schema.columns " +
                          "WHERE table_name = ? ORDER BY ordinal_position";
-            List<Map<String, Object>> columns = postgresTemplate.queryForList(query, targetTable);
+            List<Map<String, Object>> columns = oracleTemplate.queryForList(query, targetTable.toUpperCase());
             tableColumnsCache.put(targetTable, columns);
             log.info("Schéma de la table cible {} chargé: {} colonnes", targetTable, columns.size());
             
@@ -68,20 +68,20 @@ public class SchemaValidationProcessor implements ItemProcessor<Map<String, Obje
             
             // Vérifier si la table existe
             try {
-                postgresTemplate.queryForObject(
+                oracleTemplate.queryForObject(
                         "SELECT to_regclass(?) IS NOT NULL",
                         Boolean.class,
-                        targetTable);
+                        targetTable.toUpperCase());
                 
                 // Si la table existe mais est vide, on la supprime pour la recréer avec un schéma générique
-                postgresTemplate.execute("DROP TABLE IF EXISTS " + targetTable);
+                oracleTemplate.execute("DROP TABLE IF EXISTS " + targetTable + " PURGE");
                 log.info("Table existante {} supprimée pour recréation", targetTable);
             } catch (Exception e) {
                 log.info("La table {} n'existe pas encore, va être créée", targetTable);
             }
             
             // Créer une table générique
-            postgresTemplate.execute("CREATE TABLE " + targetTable + " (" +
+            oracleTemplate.execute("CREATE TABLE " + targetTable + " (" +
                     "id SERIAL PRIMARY KEY, " +
                     "data JSONB" +
                     ")");
@@ -234,5 +234,30 @@ public class SchemaValidationProcessor implements ItemProcessor<Map<String, Obje
         
         // En cas d'échec de conversion, renvoyer la valeur originale
         return value;
+    }
+
+    private List<ColumnMetadata> getTargetTableColumns() {
+        String query = "SELECT column_name, data_type, data_length FROM all_tab_columns WHERE table_name = ?";
+        List<Map<String, Object>> columns = oracleTemplate.queryForList(query, targetTable.toUpperCase());
+        // ... existing code ...
+    }
+    
+    private boolean tableExists() {
+        try {
+            Integer count = oracleTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM all_tables WHERE table_name = ?", 
+                    Integer.class, targetTable.toUpperCase());
+            return count != null && count > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    private void createTargetTable(Map<String, Object> item) {
+        oracleTemplate.execute("DROP TABLE " + targetTable + " PURGE");
+        // ... existing code ...
+        oracleTemplate.execute("CREATE TABLE " + targetTable + " (" +
+                String.join(", ", columnDefinitions) + ")");
+        // ... existing code ...
     }
 } 

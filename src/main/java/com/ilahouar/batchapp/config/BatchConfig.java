@@ -59,14 +59,12 @@ public class BatchConfig {
      * Configuration du job principal
      */
     @Bean
-    public Job trinoToPostgresJob(
-            JobCompletionNotificationListener listener,
-            @Qualifier("processDataStep") Step processDataStep) {
-        return new JobBuilder("trinoToPostgresJob", jobRepository)
-                .incrementer(new RunIdIncrementer())
-                .listener(listener)
-                .flow(processDataStep)
-                .end()
+    public Job trinoToOracleJob(
+            JobRepository jobRepository,
+            Step trinoToOracleStep) {
+        return new JobBuilder("trinoToOracleJob", jobRepository)
+                .start(trinoToOracleStep)
+                .listener(jobCompletionNotificationListener)
                 .build();
     }
 
@@ -74,13 +72,15 @@ public class BatchConfig {
      * Configuration de l'étape de traitement avec parallélisme et résilience
      */
     @Bean
-    public Step processDataStep(
+    public Step trinoToOracleStep(
+            JobRepository jobRepository,
+            PlatformTransactionManager transactionManager,
             @Qualifier("trinoItemReader") JdbcCursorItemReader<Map<String, Object>> reader,
-            @Qualifier("postgresItemWriter") JdbcBatchItemWriter<Map<String, Object>> writer,
             SchemaValidationProcessor processor,
-            StepSkipListener skipListener,
-            SkipPolicy skipPolicy) {
-        return new StepBuilder("processDataStep", jobRepository)
+            @Qualifier("oracleItemWriter") JdbcBatchItemWriter<Map<String, Object>> writer,
+            SkipPolicyConfiguration skipPolicy,
+            @Value("${batch.chunk-size:5000}") int chunkSize) {
+        return new StepBuilder("trinoToOracleStep", jobRepository)
                 .<Map<String, Object>, Map<String, Object>>chunk(chunkSize, transactionManager)
                 .reader(reader)
                 .processor(processor)
@@ -120,17 +120,17 @@ public class BatchConfig {
     }
 
     /**
-     * Configuration du writer pour PostgreSQL
+     * Configuration du writer pour Oracle
      */
     @Bean
     @StepScope
-    public JdbcBatchItemWriter<Map<String, Object>> postgresItemWriter(
-            @Qualifier("postgresDataSource") DataSource dataSource,
-            @Value("#{jobParameters['targetTable'] ?: '${batch.postgres.table-name:default_table}'}") String tableName) {
+    public JdbcBatchItemWriter<Map<String, Object>> oracleItemWriter(
+            @Qualifier("oracleDataSource") DataSource dataSource,
+            @Value("#{jobParameters['targetTable'] ?: '${batch.oracle.table-name:default_table}'}") String tableName) {
         
-        log.info("Initialisation du writer pour la table PostgreSQL: {}", tableName);
+        log.info("Initialisation du writer pour la table Oracle: {}", tableName);
         
-        // Récupérer les colonnes de la table PostgreSQL pour la requête d'insertion
+        // Récupérer les colonnes de la table Oracle pour la requête d'insertion
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         String query = "SELECT column_name, data_type FROM information_schema.columns " +
                      "WHERE table_name = ? ORDER BY ordinal_position";
@@ -211,7 +211,7 @@ public class BatchConfig {
                     .sql(sql)
                     .itemSqlParameterSourceProvider(item -> {
                         try {
-                            // Convertir l'objet en JSON pour PostgreSQL
+                            // Convertir l'objet en JSON pour Oracle
                             com.fasterxml.jackson.databind.ObjectMapper objectMapper = 
                                 new com.fasterxml.jackson.databind.ObjectMapper();
                             String jsonData = objectMapper.writeValueAsString(item.get("data"));
@@ -235,7 +235,7 @@ public class BatchConfig {
             
             columnNames.add(column);
             
-            // Pour les colonnes JSONB, utiliser la conversion PostgreSQL
+            // Pour les colonnes JSONB, utiliser la conversion Oracle
             if ("jsonb".equals(dataType)) {
                 paramPlaceholders.add("cast(:" + column + " as jsonb)");
             } else {
@@ -261,7 +261,7 @@ public class BatchConfig {
                             org.springframework.jdbc.core.namedparam.MapSqlParameterSource parameterSource = 
                                 new org.springframework.jdbc.core.namedparam.MapSqlParameterSource();
                             
-                            // Convertir l'objet en JSON pour PostgreSQL
+                            // Convertir l'objet en JSON pour Oracle
                             com.fasterxml.jackson.databind.ObjectMapper objectMapper = 
                                 new com.fasterxml.jackson.databind.ObjectMapper();
                             String jsonData = objectMapper.writeValueAsString(item.get("data"));
