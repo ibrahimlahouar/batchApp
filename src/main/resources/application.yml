@@ -28,7 +28,7 @@ spring:
 # Configuration personnalisée du batch
 batch:
   # Taille des chunks pour le traitement par lots
-  chunk-size: 1000
+  chunk-size: 10000
   
   # Configuration du pool de threads
   thread-pool:
@@ -45,9 +45,11 @@ batch:
   # Nombre maximum d'enregistrements à ignorer avant échec
   max-skips: 100
   
-  # Configuration PostgreSQL
+  # Noms de tables par défaut
+  trino:
+    table-name: orders
   postgres:
-    table-name: customer  # Table de destination dans PostgreSQL
+    table-name: orders
 
 # Configuration du logging
 logging:

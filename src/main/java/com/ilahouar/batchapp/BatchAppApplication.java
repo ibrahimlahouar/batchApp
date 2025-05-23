@@ -1,5 +1,6 @@
 package com.ilahouar.batchapp;
 
+import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -10,6 +11,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * avec un traitement parallèle pour gérer efficacement les grands volumes de données.
  */
 @SpringBootApplication
+@EnableBatchProcessing
 public class BatchAppApplication {
 
     public static void main(String[] args) {

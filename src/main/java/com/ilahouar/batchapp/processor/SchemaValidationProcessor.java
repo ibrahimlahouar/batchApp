@@ -1,6 +1,7 @@
 package com.ilahouar.batchapp.processor;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * et qui effectue les transformations nécessaires entre les deux
  */
 @Component
+@StepScope
 @Slf4j
 public class SchemaValidationProcessor implements ItemProcessor<Map<String, Object>, Map<String, Object>> {
 
@@ -28,9 +30,10 @@ public class SchemaValidationProcessor implements ItemProcessor<Map<String, Obje
     
     public SchemaValidationProcessor(
             @Qualifier("postgresDataSource") DataSource postgresDataSource,
-            @Value("${batch.postgres.table-name}") String targetTable) {
+            @Value("#{jobParameters['targetTable'] ?: '${batch.postgres.table-name:default_table}'}") String targetTable) {
         this.postgresTemplate = new JdbcTemplate(postgresDataSource);
         this.targetTable = targetTable;
+        log.info("SchemaValidationProcessor initialisé avec la table cible: {}", targetTable);
         // Initialisation du cache à la création pour éviter les requêtes multiples
         initializeColumnsCache();
     }

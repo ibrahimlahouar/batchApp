@@ -98,13 +98,14 @@ public class BatchConfig {
 
     /**
      * Configuration du reader pour Trino
-     * Le nom de la table source est passé en paramètre au lancement du job
      */
     @Bean
     @StepScope
     public JdbcCursorItemReader<Map<String, Object>> trinoItemReader(
             @Qualifier("trinoDataSource") DataSource dataSource,
-            @Value("#{jobParameters['tableName']}") String tableName) {
+            @Value("#{jobParameters['tableName'] ?: '${batch.trino.table-name:default_table}'}") String tableName) {
+        
+        log.info("Initialisation du reader pour la table Trino: {}", tableName);
         
         String sql = "SELECT * FROM " + tableName;
         log.info("Lecture depuis la table Trino: {}", tableName);
@@ -125,7 +126,9 @@ public class BatchConfig {
     @StepScope
     public JdbcBatchItemWriter<Map<String, Object>> postgresItemWriter(
             @Qualifier("postgresDataSource") DataSource dataSource,
-            @Value("${batch.postgres.table-name}") String tableName) {
+            @Value("#{jobParameters['targetTable'] ?: '${batch.postgres.table-name:default_table}'}") String tableName) {
+        
+        log.info("Initialisation du writer pour la table PostgreSQL: {}", tableName);
         
         // Récupérer les colonnes de la table PostgreSQL pour la requête d'insertion
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);

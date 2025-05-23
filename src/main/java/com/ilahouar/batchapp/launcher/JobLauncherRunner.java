@@ -36,11 +36,12 @@ public class JobLauncherRunner implements ApplicationRunner {
             return;
         }
         
-        log.info("Démarrage du job avec la table source: {}", tableName);
+        log.info("Démarrage du job avec la table source et cible: {}", tableName);
         
         // Construction des paramètres du job
         JobParameters params = new JobParametersBuilder()
                 .addString("tableName", tableName)
+                .addString("targetTable", tableName)
                 .addDate("runDate", new Date())
                 .toJobParameters();
         

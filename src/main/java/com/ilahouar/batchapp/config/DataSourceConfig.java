@@ -39,6 +39,15 @@ public class DataSourceConfig {
     public DataSource postgresDataSource() {
         return DataSourceBuilder.create().build();
     }
+    
+    /**
+     * Bean dataSource par défaut pour Spring Batch
+     * Réutilisation de la source PostgreSQL pour les métadonnées de Spring Batch
+     */
+    @Bean(name = "dataSource")
+    public DataSource dataSource(@Qualifier("postgresDataSource") DataSource postgresDataSource) {
+        return postgresDataSource;
+    }
 
     /**
      * Gestionnaire de transactions pour PostgreSQL
