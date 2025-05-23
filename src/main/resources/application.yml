@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: trino-postgres-batch
+  
+  # Configuration des bases de données
+  datasource:
+    # Configuration PostgreSQL (destination)
+    postgres:
+      jdbc-url: jdbc:postgresql://localhost:5432/mydatabase
+      username: myuser
+      password: mypassword
+      driver-class-name: org.postgresql.Driver
+      
+    # Configuration Trino (source)
+    trino:
+      jdbc-url: jdbc:trino://localhost:8080/tpch/sf1
+      username: tpch
+      password:
+      driver-class-name: io.trino.jdbc.TrinoDriver
+  
+  # Configuration Spring Batch
+  batch:
+    jdbc:
+      initialize-schema: always  # Crée les tables nécessaires à Spring Batch au démarrage
+    job:
+      enabled: false  # Désactive l'exécution automatique des jobs au démarrage
+
+# Configuration personnalisée du batch
+batch:
+  # Taille des chunks pour le traitement par lots
+  chunk-size: 1000
+  
+  # Configuration du pool de threads
+  thread-pool:
+    core-size: 10
+    max-size: 20
+    queue-capacity: 50
+  
+  # Limite de parallélisme pour le throttling
+  throttle-limit: 8
+  
+  # Nombre maximum de tentatives en cas d'erreur
+  max-retries: 3
+  
+  # Nombre maximum d'enregistrements à ignorer avant échec
+  max-skips: 100
+  
+  # Configuration PostgreSQL
+  postgres:
+    table-name: customer  # Table de destination dans PostgreSQL
+
+# Configuration du logging
+logging:
+  level:
+    root: INFO
+    com.ilahouar.batchapp: INFO
+    org.springframework.batch: INFO
+    org.springframework.jdbc: WARN
+    
+    # Pour le débogage, décommenter les lignes suivantes
+    # com.ilahouar.batchapp: DEBUG
+    # org.springframework.batch: DEBUG
+    # org.springframework.jdbc: DEBUG 
