@@ -1,0 +1,42 @@
+spring:
+  datasource:
+    # Configuration Trino spécifique à P1
+    trino:
+      jdbc-url: jdbc:trino://localhost:8080/tpch
+      username: tpch
+      password: 
+      driver-class-name: io.trino.jdbc.TrinoDriver
+      
+    # Configuration PostgreSQL spécifique à P1
+    postgres:
+      jdbc-url: jdbc:postgresql://localhost:5432/mydatabase
+      username: myuser
+      password: mypassword
+      driver-class-name: org.postgresql.Driver
+
+# Configuration des tables spécifiques à P1
+batch:
+  # Paramètres généraux
+  chunk-size: 10000
+  throttle-limit: 4
+  max-retries: 3
+  
+  # Configuration du pool de threads
+  thread-pool:
+    core-size: 4
+    max-size: 8
+    queue-capacity: 20
+  
+  # Tables à traiter
+  tables:
+    orders:
+      source-schema: sf1
+      source-table: orders
+      target-schema: public
+      target-table: orders
+    
+    customer:
+      source-schema: sf1
+      source-table: customer
+      target-schema: public
+      target-table: customer

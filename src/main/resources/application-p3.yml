@@ -1,0 +1,80 @@
+spring:
+  datasource:
+    # Configuration Trino spécifique à P3
+    trino:
+      jdbc-url: jdbc:trino://localhost:8080/analytics/prod
+      username: analytics
+      password: analytics456
+      driver-class-name: io.trino.jdbc.TrinoDriver
+      
+    # Configuration PostgreSQL spécifique à P3
+    postgres:
+      jdbc-url: jdbc:postgresql://localhost:5432/mydatabase
+      username: myuser
+      password: mypassword
+      driver-class-name: org.postgresql.Driver
+
+# Configuration des tables spécifiques à P3
+batch:
+  # Paramètres généraux
+  chunk-size: 10000
+  throttle-limit: 10
+  max-retries: 5
+  thread-pool:
+    core-size: 20
+    max-size: 30
+    queue-capacity: 100
+  
+  # Tables à traiter
+  tables:
+    customers:
+      source-schema: analytics
+      source-table: customer_data
+      target-schema: crm
+      target-table: customers
+      options:
+        columns:
+          - c_custkey
+          - c_name
+          - c_address
+          - c_nationkey
+          - c_phone
+          - c_acctbal
+          - c_mktsegment
+          - c_comment
+        where: "c_acctbal > 0"
+        orderBy: "c_custkey"
+    
+    visits:
+      source-schema: analytics
+      source-table: website_visits
+      target-schema: crm
+      target-table: user_visits
+      options:
+        where: "visit_date >= CURRENT_DATE - INTERVAL '3' MONTH"
+        limit: 500000
+    
+    interactions:
+      source-schema: analytics
+      source-table: customer_interactions
+      target-schema: crm
+      target-table: interactions
+      options:
+        fetchSize: 5000
+    
+    # Table agrégée avec requête personnalisée
+    monthly_summary:
+      source-schema: analytics
+      target-schema: crm
+      target-table: monthly_summaries
+      options:
+        customQuery: >
+          SELECT 
+            date_trunc('month', interaction_date) AS month,
+            interaction_type,
+            COUNT(*) AS interaction_count,
+            COUNT(DISTINCT customer_id) AS customer_count
+          FROM analytics.customer_interactions
+          WHERE interaction_date >= DATE '2023-01-01'
+          GROUP BY 1, 2
+          ORDER BY 1 DESC, 2 

@@ -1,72 +1,104 @@
-# Application de traitement Big Data Trino vers PostgreSQL
+# Batch App - Transfert de données Trino vers PostgreSQL
 
-Cette application Spring Boot utilise Spring Batch pour traiter efficacement des milliards de lignes de données depuis une source Trino vers une base de données PostgreSQL.
+Cette application Spring Batch permet de transférer des données de tables Trino vers PostgreSQL de manière efficace et configurable.
 
-## Fonctionnalités
+## Caractéristiques
 
-- **Lecture efficace** depuis Trino via JDBC
-- **Écriture optimisée** vers PostgreSQL
-- **Traitement parallèle** avec ThreadPoolTaskExecutor
-- **Résilience** avec mécanisme de retry et skip
-- **Validation des schémas** entre la source et la destination
-- **Logging avancé** des erreurs et des événements
-- **Paramétrage flexible** via le fichier application.yml
-
-## Prérequis
-
-- Java 17+
-- Maven 3.6+
-- Une base de données Trino (source des données)
-- Une base de données PostgreSQL (destination des données)
-
-## Configuration
-
-Avant de lancer l'application, modifiez le fichier `src/main/resources/application.yml` avec :
-
-1. Les informations de connexion à votre instance Trino
-2. Les informations de connexion à votre base PostgreSQL
-3. Le paramétrage du traitement parallèle (threads, chunk size, etc.)
-
-## Compilation
-
-```bash
-mvn clean package
-```
+- Traitement parallèle avec chunks pour améliorer les performances
+- Support de centaines de tables et schémas via configuration YAML
+- Définition des tables sans code Java
+- Configuration par profil pour différents projets (P1, P2, P3)
+- Transformation et validation des données entre les sources
+- Gestion flexible des schémas (création automatique au besoin)
+- Support des données JSONB pour une flexibilité maximale
+- Gestion d'erreurs avec retry, skip et logging
+- Monitoring et suivi des jobs
 
 ## Utilisation
 
-L'application nécessite le paramètre `tableName` pour spécifier la table source dans Trino :
+### Lancement avec un profil spécifique
+
+Pour lancer l'application avec le profil P1 :
 
 ```bash
-java -jar target/batchApp-0.0.1-SNAPSHOT.jar --tableName=source_table
+./mvnw spring-boot:run -Dspring-boot.run.profiles=p1 -Dspring-boot.run.arguments="--tableName=orders"
 ```
 
-### Paramètres obligatoires
+Pour lancer l'application avec le profil P2 :
 
-- `--tableName` : Nom de la table à lire dans Trino
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=p2 -Dspring-boot.run.arguments="--tableName=products"
+```
 
-### Utilisation avec différents projets
+Pour lancer l'application avec le profil P3 :
 
-Cette application peut être utilisée avec différents projets (P1, P2, P3), chacun ayant des besoins spécifiques :
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=p3 -Dspring-boot.run.arguments="--tableName=customers"
+```
 
-1. **Configurer la table cible** dans `application.yml` avec le paramètre `batch.postgres.table-name`
-2. **Lancer l'application** en spécifiant la table source correspondant au projet
+### Paramètres
+
+- `--tableName`: Nom de la table source dans Trino
+- `--targetTable`: Nom de la table cible dans PostgreSQL (par défaut, identique à tableName)
+- `--jobName`: Nom du job à exécuter (optionnel, alternative à tableName)
+
+## Profils disponibles
+
+- **p1**: Configuration pour le projet P1 (tables TPCH)
+- **p2**: Configuration pour le projet P2 (tables E-commerce)
+- **p3**: Configuration pour le projet P3 (tables Analytics)
+
+## Configuration des tables dans YAML
+
+Toute la configuration des tables se fait dans les fichiers YAML. Pour ajouter des tables, 
+modifiez simplement le fichier de configuration du profil correspondant :
+
+- `application-p1.yml` pour le projet P1
+- `application-p2.yml` pour le projet P2
+- `application-p3.yml` pour le projet P3
+
+### Format de configuration
+
+```yaml
+batch:
+  tables:
+    nom_de_table:
+      source-schema: schema_source
+      source-table: nom_table_source  # Optionnel, utilise la clé par défaut
+      target-schema: schema_cible
+      target-table: nom_table_cible   # Optionnel, utilise la clé par défaut
+      options:
+        # Options avancées (toutes optionnelles)
+        columns: [col1, col2, col3]    # Colonnes à sélectionner
+        where: "condition SQL"         # Condition WHERE 
+        orderBy: "colonne ASC/DESC"    # Ordre de tri
+        limit: 10000                   # Nombre max de lignes
+        fetchSize: 5000                # Taille de lecture JDBC
+        customQuery: "SELECT ..."      # Requête SQL personnalisée
+```
 
 ## Architecture
 
-L'application est structurée en plusieurs composants :
+L'application utilise une architecture standardisée :
 
-- **Configuration des sources de données** : Connexion à Trino et PostgreSQL
-- **Configuration du Batch** : Définition du job, des steps et du parallélisme
-- **Processeur de validation de schéma** : Vérification de la compatibilité des champs
-- **Listeners** : Suivi du job et gestion des erreurs
-- **Launcher** : Démarrage du job avec les paramètres
+- **DynamicTableConfig**: Configuration générique pour toutes les tables
+- **DynamicTableConfigLoader**: Charge les configurations depuis les fichiers YAML
+- **TableJobFactory**: Crée les jobs à partir des configurations
+- **MultiTableJobLauncher**: Lance les jobs en fonction des paramètres
 
-## Performances et optimisation
+## Ajout de nouvelles tables
 
-L'application est optimisée pour traiter de grandes quantités de données grâce à :
+Il suffit de modifier le fichier YAML du profil correspondant pour ajouter une nouvelle table.
+L'application détectera automatiquement cette table et créera le job nécessaire.
 
-- Le traitement par chunks configurable
-- Le parallélisme avec ThreadPoolTaskExecutor
-- La limitation du throttling pour éviter la surcharge
-- La gestion des connexions JDBC avec pooling 
+## Configuration
+
+Voir les fichiers `application-*.yml` pour la configuration détaillée de chaque profil.
+
+## Dépendances
+
+- Spring Boot 3.1.5
+- Spring Batch
+- PostgreSQL JDBC Driver
+- Trino JDBC Driver
+- Jackson pour le traitement JSON 

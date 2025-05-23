@@ -1,0 +1,47 @@
+spring:
+  datasource:
+    # Configuration Trino spécifique à P2
+    trino:
+      jdbc-url: jdbc:trino://localhost:8080/ecommerce/data
+      username: ecommerce
+      password: ecommerce123
+      driver-class-name: io.trino.jdbc.TrinoDriver
+      
+    # Configuration PostgreSQL spécifique à P2
+    postgres:
+      jdbc-url: jdbc:postgresql://localhost:5432/mydatabase
+      username: myuser
+      password: mypassword
+      driver-class-name: org.postgresql.Driver
+
+# Configuration des tables spécifiques à P2
+batch:
+  # Paramètres généraux
+  chunk-size: 8000
+  throttle-limit: 6
+  max-retries: 5
+  
+  # Tables à traiter
+  tables:
+    products:
+      source-schema: ecommerce
+      source-table: products
+      target-schema: sales
+      target-table: products
+      options:
+        where: "price > 100"
+        fetchSize: 5000
+      
+    categories:
+      source-schema: ecommerce
+      source-table: categories
+      target-schema: sales
+      target-table: product_categories
+      
+    sales:
+      source-schema: ecommerce
+      source-table: sales_data
+      target-schema: sales
+      target-table: transactions
+      options:
+        where: "transaction_date >= CURRENT_DATE - INTERVAL '1' YEAR" 

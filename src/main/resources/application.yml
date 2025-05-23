@@ -1,6 +1,8 @@
 spring:
   application:
-    name: trino-postgres-batch
+    name: batchApp
+  main:
+    allow-bean-definition-overriding: true
   
   # Configuration des bases de données
   datasource:
@@ -13,7 +15,7 @@ spring:
       
     # Configuration Trino (source)
     trino:
-      jdbc-url: jdbc:trino://localhost:8080/tpch/sf1
+      jdbc-url: jdbc:trino://localhost:8080/tpch/sf1?SSL=false
       username: tpch
       password:
       driver-class-name: io.trino.jdbc.TrinoDriver
@@ -21,45 +23,32 @@ spring:
   # Configuration Spring Batch
   batch:
     jdbc:
-      initialize-schema: always  # Crée les tables nécessaires à Spring Batch au démarrage
+      initialize-schema: always
     job:
-      enabled: false  # Désactive l'exécution automatique des jobs au démarrage
+      enabled: false  # Désactivé car nous utilisons notre propre launcer
 
-# Configuration personnalisée du batch
+# Configuration batch
 batch:
-  # Taille des chunks pour le traitement par lots
-  chunk-size: 10000
-  
-  # Configuration du pool de threads
-  thread-pool:
-    core-size: 10
-    max-size: 20
-    queue-capacity: 50
-  
-  # Limite de parallélisme pour le throttling
-  throttle-limit: 8
-  
-  # Nombre maximum de tentatives en cas d'erreur
+  # Paramètres généraux
+  chunk-size: 5000
+  throttle-limit: 4
   max-retries: 3
   
-  # Nombre maximum d'enregistrements à ignorer avant échec
-  max-skips: 100
-  
-  # Noms de tables par défaut
-  trino:
-    table-name: orders
-  postgres:
-    table-name: orders
-
-# Configuration du logging
+  # Skip policy configuration
+  skip-policy:
+    enabled: true
+    max-skips: 100
+    
+# Configuration des loggers
 logging:
   level:
     root: INFO
     com.ilahouar.batchapp: INFO
     org.springframework.batch: INFO
-    org.springframework.jdbc: WARN
     
-    # Pour le débogage, décommenter les lignes suivantes
-    # com.ilahouar.batchapp: DEBUG
-    # org.springframework.batch: DEBUG
-    # org.springframework.jdbc: DEBUG 
+    # Niveau DEBUG pour voir les requêtes SQL
+    # org.springframework.jdbc.core.JdbcTemplate: DEBUG
+    
+    # Niveau TRACE pour les opérations batch détaillées
+    # org.springframework.batch.core: DEBUG
+    # org.springframework.batch.item: DEBUG 

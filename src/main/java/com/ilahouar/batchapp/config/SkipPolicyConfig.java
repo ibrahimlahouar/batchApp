@@ -15,8 +15,11 @@ import java.sql.SQLException;
 @Slf4j
 public class SkipPolicyConfig {
 
-    @Value("${batch.max-skips}")
+    @Value("${batch.skip-policy.max-skips:100}")
     private int maxSkips;
+
+    @Value("${batch.skip-policy.enabled:true}")
+    private boolean skipEnabled;
 
     /**
      * Définit quand ignorer une erreur et continuer le traitement
@@ -25,6 +28,12 @@ public class SkipPolicyConfig {
     @Bean
     public SkipPolicy skipPolicy() {
         return (throwable, skipCount) -> {
+            // Si les sauts sont désactivés, ne pas sauter les erreurs
+            if (!skipEnabled) {
+                log.warn("Les sauts sont désactivés, erreur non ignorée: {}", throwable.getMessage());
+                return false;
+            }
+            
             // Si le nombre maximum de sauts est dépassé, on arrête d'ignorer les erreurs
             if (skipCount > maxSkips) {
                 log.warn("Nombre maximum de sauts atteint ({}), arrêt des sauts", maxSkips);
