@@ -45,6 +45,8 @@ public class BatchConfig {
     private final JobRepository jobRepository;
     private final PlatformTransactionManager transactionManager;
     private final TaskExecutor batchTaskExecutor;
+    private final JobCompletionNotificationListener jobCompletionNotificationListener;
+    private final StepSkipListener skipListener;
 
     @Value("${batch.chunk-size}")
     private int chunkSize;
@@ -78,7 +80,7 @@ public class BatchConfig {
             @Qualifier("trinoItemReader") JdbcCursorItemReader<Map<String, Object>> reader,
             SchemaValidationProcessor processor,
             @Qualifier("oracleItemWriter") JdbcBatchItemWriter<Map<String, Object>> writer,
-            SkipPolicyConfiguration skipPolicy,
+            SkipPolicy skipPolicy,
             @Value("${batch.chunk-size:5000}") int chunkSize) {
         return new StepBuilder("trinoToOracleStep", jobRepository)
                 .<Map<String, Object>, Map<String, Object>>chunk(chunkSize, transactionManager)
@@ -130,160 +132,68 @@ public class BatchConfig {
         
         log.info("Initialisation du writer pour la table Oracle: {}", tableName);
         
-        // Récupérer les colonnes de la table Oracle pour la requête d'insertion
+        // Récupérer les métadonnées de la table Oracle
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
-        String query = "SELECT column_name, data_type FROM information_schema.columns " +
-                     "WHERE table_name = ? ORDER BY ordinal_position";
-        
-        List<String> columns;
-        List<String> dataTypes = new ArrayList<>();
         
         try {
-            List<Map<String, Object>> columnData = jdbcTemplate.queryForList(query, tableName);
-            columns = columnData.stream()
-                    .map(col -> col.get("column_name").toString())
-                    .collect(java.util.stream.Collectors.toList());
-                    
-            dataTypes = columnData.stream()
-                    .map(col -> col.get("data_type").toString())
-                    .collect(java.util.stream.Collectors.toList());
-                    
-            log.info("Colonnes identifiées pour la table {}: {}", tableName, columns);
+            // Récupérer les colonnes
+            String query = "SELECT column_name FROM all_tab_columns WHERE table_name = ?";
+            List<Map<String, Object>> columnMaps = jdbcTemplate.queryForList(query, tableName.toUpperCase());
+            List<String> columns = columnMaps.stream()
+                .map(col -> col.get("column_name").toString())
+                .collect(java.util.stream.Collectors.toList());
             
-            // Vérifier si la table a une structure générique avec JSONB
-            boolean hasJsonbColumn = dataTypes.contains("jsonb");
-            if (hasJsonbColumn) {
-                log.info("Table {} utilise un format JSONB pour stocker les données", tableName);
+            // Identifier les colonnes IDENTITY
+            String identityQuery = "SELECT column_name FROM all_tab_identity_cols WHERE table_name = ?";
+            List<Map<String, Object>> identityMaps = jdbcTemplate.queryForList(identityQuery, tableName.toUpperCase());
+            List<String> identityColumns = identityMaps.stream()
+                .map(col -> col.get("column_name").toString())
+                .collect(java.util.stream.Collectors.toList());
+            
+            // Filtrer les colonnes IDENTITY
+            columns.removeAll(identityColumns);
+            
+            if (columns.isEmpty()) {
+                throw new RuntimeException("Aucune colonne non-IDENTITY trouvée pour " + tableName);
             }
             
-        } catch (Exception e) {
-            log.warn("Impossible de récupérer les colonnes de la table {}, utilisation d'un INSERT générique. Erreur: {}", 
-                     tableName, e.getMessage());
-            // Requête d'insertion générique en cas d'échec
-            return new JdbcBatchItemWriterBuilder<Map<String, Object>>()
-                    .dataSource(dataSource)
-                    .sql("INSERT INTO " + tableName + " VALUES ()")
-                    .itemSqlParameterSourceProvider(item -> 
-                        new org.springframework.jdbc.core.namedparam.MapSqlParameterSource(item))
-                    .build();
-        }
-        
-        // Si aucune colonne trouvée, rien à insérer
-        if (columns.isEmpty()) {
-            log.warn("Aucune colonne trouvée dans la table {}, l'insertion échouera", tableName);
-            // Requête d'insertion vide qui échouera, mais évite une erreur de syntaxe SQL
-            return new JdbcBatchItemWriterBuilder<Map<String, Object>>()
-                    .dataSource(dataSource)
-                    .sql("INSERT INTO " + tableName + " DEFAULT VALUES")
-                    .itemSqlParameterSourceProvider(item -> 
-                        new org.springframework.jdbc.core.namedparam.MapSqlParameterSource(item))
-                    .build();
-        }
-        
-        // Vérifier si c'est une table avec auto-increment (SERIAL) pour l'ID
-        boolean hasSerialId = false;
-        for (int i = 0; i < columns.size(); i++) {
-            if ("id".equals(columns.get(i))) {
-                // Vérifier si c'est une séquence auto-générée
-                try {
-                    String seqQuery = "SELECT pg_get_serial_sequence(?, 'id') IS NOT NULL";
-                    Boolean isSerial = jdbcTemplate.queryForObject(seqQuery, Boolean.class, tableName);
-                    hasSerialId = isSerial != null && isSerial;
-                    if (hasSerialId) {
-                        log.info("Colonne 'id' détectée comme SERIAL/auto-increment");
-                    }
-                } catch (Exception e) {
-                    log.debug("Erreur lors de la vérification de la séquence: {}", e.getMessage());
-                }
-                break;
+            // Construire les parties de la requête
+            StringJoiner columnNames = new StringJoiner(", ");
+            StringJoiner paramNames = new StringJoiner(", ");
+            
+            for (String column : columns) {
+                columnNames.add(column);
+                // Préserver la casse originale
+                paramNames.add(":" + column);
             }
-        }
-        
-        // Si une colonne JSONB est trouvée et que l'ID est auto-généré
-        boolean hasJsonbColumn = dataTypes.contains("jsonb");
-        if (hasJsonbColumn && hasSerialId) {
-            // SQL pour insertion avec génération d'ID automatique
-            String sql = "INSERT INTO " + tableName + " (data) VALUES (cast(:data as jsonb))";
-            log.info("Requête d'insertion JSONB avec ID auto-généré: {}", sql);
+            
+            String insertSql = String.format("INSERT INTO %s (%s) VALUES (%s)", 
+                    tableName, columnNames, paramNames);
+            
+            log.info("Writer standard pour {}: {}", tableName, insertSql);
             
             return new JdbcBatchItemWriterBuilder<Map<String, Object>>()
                     .dataSource(dataSource)
-                    .sql(sql)
+                    .sql(insertSql)
                     .itemSqlParameterSourceProvider(item -> {
-                        try {
-                            // Convertir l'objet en JSON pour Oracle
-                            com.fasterxml.jackson.databind.ObjectMapper objectMapper = 
-                                new com.fasterxml.jackson.databind.ObjectMapper();
-                            String jsonData = objectMapper.writeValueAsString(item.get("data"));
+                        org.springframework.jdbc.core.namedparam.MapSqlParameterSource paramSource = 
+                            new org.springframework.jdbc.core.namedparam.MapSqlParameterSource();
+                        
+                        for (Map.Entry<String, Object> entry : item.entrySet()) {
+                            // Préserver la casse originale
+                            String key = entry.getKey();
+                            Object value = entry.getValue();
                             
-                            return new org.springframework.jdbc.core.namedparam.MapSqlParameterSource("data", jsonData);
-                        } catch (Exception e) {
-                            log.error("Erreur lors de la conversion en JSON: {}", e.getMessage());
-                            return new org.springframework.jdbc.core.namedparam.MapSqlParameterSource("data", "{}");
+                            // Ne pas convertir les booléens
+                            paramSource.addValue(key, value);
                         }
+                        
+                        return paramSource;
                     })
                     .build();
+        } catch (Exception e) {
+            log.error("Erreur lors de la création du writer pour {}: {}", tableName, e.getMessage());
+            throw new RuntimeException("Erreur lors de la création du writer pour " + tableName, e);
         }
-        
-        // Construction de la requête d'insertion standard
-        StringJoiner columnNames = new StringJoiner(", ");
-        StringJoiner paramPlaceholders = new StringJoiner(", ");
-        
-        for (int i = 0; i < columns.size(); i++) {
-            String column = columns.get(i);
-            String dataType = dataTypes.get(i);
-            
-            columnNames.add(column);
-            
-            // Pour les colonnes JSONB, utiliser la conversion Oracle
-            if ("jsonb".equals(dataType)) {
-                paramPlaceholders.add("cast(:" + column + " as jsonb)");
-            } else {
-                paramPlaceholders.add(":" + column);
-            }
-        }
-        
-        String insertSql = String.format(
-                "INSERT INTO %s (%s) VALUES (%s)", 
-                tableName, 
-                columnNames.toString(), 
-                paramPlaceholders.toString());
-        
-        log.info("Requête d'insertion générique générée: {}", insertSql);
-        
-        return new JdbcBatchItemWriterBuilder<Map<String, Object>>()
-                .dataSource(dataSource)
-                .sql(insertSql)
-                .itemSqlParameterSourceProvider(item -> {
-                    // Si l'item contient une clé 'data' qui est une Map, la convertir en JSON
-                    if (item.containsKey("data") && item.get("data") instanceof Map) {
-                        try {
-                            org.springframework.jdbc.core.namedparam.MapSqlParameterSource parameterSource = 
-                                new org.springframework.jdbc.core.namedparam.MapSqlParameterSource();
-                            
-                            // Convertir l'objet en JSON pour Oracle
-                            com.fasterxml.jackson.databind.ObjectMapper objectMapper = 
-                                new com.fasterxml.jackson.databind.ObjectMapper();
-                            String jsonData = objectMapper.writeValueAsString(item.get("data"));
-                            
-                            parameterSource.addValue("data", jsonData);
-                            
-                            // Ajouter l'ID s'il est présent
-                            if (item.containsKey("id")) {
-                                parameterSource.addValue("id", item.get("id"));
-                            }
-                            
-                            return parameterSource;
-                        } catch (Exception e) {
-                            log.error("Erreur lors de la conversion en JSON: {}", e.getMessage());
-                            // En cas d'erreur, retourner l'item tel quel
-                            return new org.springframework.jdbc.core.namedparam.MapSqlParameterSource(item);
-                        }
-                    } else {
-                        // Si ce n'est pas un format JSON, utiliser l'item tel quel
-                        return new org.springframework.jdbc.core.namedparam.MapSqlParameterSource(item);
-                    }
-                })
-                .build();
     }
 } 

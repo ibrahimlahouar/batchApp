@@ -100,9 +100,10 @@ public class BatchLauncher {
             // Essayer le nom exact
             Job job = tableJobs.get(jobName);
             
-            // Si non trouvé, essayer le job générique
+            // Si non trouvé, essayer une autre approche
             if (job == null) {
-                job = jobRegistry.getJob(jobName);
+                // Chercher dans les jobs disponibles par une autre méthode
+                log.warn("Job {} non trouvé directement, recherche de job alternatif", jobName);
             }
             
             // Si le job n'est pas trouvé, essayons d'utiliser le job générique trinoToOracleJob
